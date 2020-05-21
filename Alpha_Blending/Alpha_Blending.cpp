@@ -5,6 +5,9 @@
 #include <assert.h>
 
 
+//#define COMPARE_TIMES
+
+
 int GetFileSize(std::ifstream& file) {
 	assert(file.is_open());
 
@@ -25,7 +28,6 @@ void MergeImgBufs(char* backBuf, char* frontBuf) {
 
 	const int startPosX = 220;
 	const int startPosY = 260;
-	const float scale = 0.6;
 
 	int backImgStart = *(reinterpret_cast<int*>(backBuf + 10));
 	int frontImgStart = *(reinterpret_cast<int*>(frontBuf + 10));
@@ -38,8 +40,8 @@ void MergeImgBufs(char* backBuf, char* frontBuf) {
 	for (int frontX = 0; frontX < frontWidth; ++frontX) {
 		for (int frontY = 0; frontY < frontHeight; ++frontY) {
 
-			int backX = startPosX + static_cast<int>(frontX * scale);
-			int backY = startPosY + static_cast<int>(frontY * scale);
+			int backX = startPosX + frontX;
+			int backY = startPosY + frontY;
 
 			unsigned char* backPixel = reinterpret_cast<unsigned char*>(backBuf + backImgStart +
 									                                    backY * backWidth * 4 + backX * 4);
@@ -84,10 +86,10 @@ void MergeImgBufs_optimized(char* backBuf, char* frontBuf) {
 	unsigned char pack2_mask_mem[] = {0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0,
 									  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-	__m256i mulAlpha_mask = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(mulAlpha_mask_mem));
-	__m256i addAlpha_mask = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(addAlpha_mask_mem));
-	__m256i pack1_mask = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pack1_mask_mem));
-	__m256i pack2_mask = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pack2_mask_mem));
+	__m256i mulAlpha_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(mulAlpha_mask_mem));
+	__m256i addAlpha_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(addAlpha_mask_mem));
+	__m256i pack1_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(pack1_mask_mem));
+	__m256i pack2_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(pack2_mask_mem));
 
 	for (int frontY = 0; frontY < frontHeight; ++frontY) {
 		int backY = startPosY + frontY;
@@ -104,7 +106,7 @@ void MergeImgBufs_optimized(char* backBuf, char* frontBuf) {
 
 			// Loading original pixels {
 			__m128i back4Px = _mm_loadu_si128(backPixel);
-			__m128i front4Px = _mm_loadu_si128(reinterpret_cast<const __m128i*>(frontBuf + frontImgStart +
+			__m128i front4Px = _mm_loadu_si128(reinterpret_cast<__m128i const*>(frontBuf + frontImgStart +
 																				frontY * frontWidth * 4 + frontX * 4));
 			// }
 
@@ -167,10 +169,13 @@ void MergeImgBufs_optimized(char* backBuf, char* frontBuf) {
 }
 
 
-void MergeImages(std::ifstream& backF, std::ifstream& frontF, std::ofstream& fout) {
+void MergeImages(std::ifstream& backF, std::ifstream& frontF, std::ofstream& fout, std::ofstream& fout_opt) {
 	assert(backF.is_open());
 	assert(frontF.is_open());
 	assert(fout.is_open());
+	assert(fout_opt.is_open());
+
+	const int timesLoop = 100000;
 
 	int backSize = GetFileSize(backF);
 	char* backBuf = new char[backSize + 1];
@@ -180,9 +185,33 @@ void MergeImages(std::ifstream& backF, std::ifstream& frontF, std::ofstream& fou
 	char* frontBuf = new char[frontSize + 1];
 	frontF.read(frontBuf, frontSize);
 
-	MergeImgBufs(backBuf, frontBuf);
-
+#ifdef COMPARE_TIMES
+	clock_t tempClock = clock();
+	for (int i = 0; i < timesLoop; ++i) {
+		MergeImgBufs(backBuf, frontBuf);
+	}
+	float naiveTime = static_cast<float>(clock() - tempClock) / CLOCKS_PER_SEC;
 	fout.write(backBuf, backSize);
+
+	backF.seekg(0, std::ios_base::beg);
+	backF.read(backBuf, backSize);
+	tempClock = clock();
+	for (int i = 0; i < timesLoop; ++i) {
+		MergeImgBufs_optimized(backBuf, frontBuf);
+	}
+	float optTime = static_cast<float>(clock() - tempClock) / CLOCKS_PER_SEC;
+	fout_opt.write(backBuf, backSize);
+
+	printf("Naive time: %f\nAVX time: %f\n", naiveTime, optTime);
+#else
+	MergeImgBufs(backBuf, frontBuf);
+	fout.write(backBuf, backSize);
+
+	backF.seekg(0, std::ios_base::beg);
+	backF.read(backBuf, backSize);
+	MergeImgBufs_optimized(backBuf, frontBuf);
+	fout_opt.write(backBuf, backSize);
+#endif
 
 	delete[] backBuf;
 	delete[] frontBuf;
@@ -192,15 +221,22 @@ int main() {
 	const char* backFName("Table.bmp");
 	const char* frontFName("Cat.bmp");
 	const char* outFName("CatOnTable.bmp");
+	const char* outoptFName("CatOnTable_opt.bmp");
 
 	std::ifstream backF(backFName, std::ios::binary);
 	std::ifstream frontF(frontFName, std::ios::binary);
 	std::ofstream fout(outFName, std::ios::binary);
-	if (!backF.is_open() || !frontF.is_open() || !fout.is_open()) {
+	std::ofstream fout_opt(outoptFName, std::ios::binary);
+	if (!backF.is_open() || !frontF.is_open() || !fout.is_open() || !fout_opt.is_open()) {
 		return -1;
 	}
 
-	MergeImages(backF, frontF, fout);
+	MergeImages(backF, frontF, fout, fout_opt);
+
+	backF.close();
+	frontF.close();
+	fout.close();
+	fout_opt.close();
 
 	return 0;
 }
