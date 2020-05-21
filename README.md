@@ -3,7 +3,7 @@
 This program merges two .bmp images.
 
 Input:
-<table>
+<table style="border-style: none">
 	<tr>
 		<td><img src="Alpha_Blending/Table.bmp" alt="Table" /></td>
 		<td><img src="Alpha_Blending/Cat.bmp" alt="Cat" /></td>
@@ -14,8 +14,8 @@ Output:
 
 ![Cat on table](./Alpha_Blending/CatOnTable.bmp)
 
-After looping the algorithms 10000 times we git the folowing runtimes:
+After looping the algorithms 10000 times we got the folowing runtimes:
 
 ![Times of algorithms](./Images/Times.png)
 
-The gain is 6.4x!
+The time gain is 6.4x!
