@@ -21,7 +21,6 @@ int GetFileSize(std::ifstream& file) {
 }
 
 
-
 class BMP_Structure {
 public:
 
@@ -107,10 +106,10 @@ void BMP_Structure::OverlayImg(BMP_Structure& frontBmp, int posX, int posY) {
 			int backY = posY + frontY;
 
 			unsigned char* backPixel = reinterpret_cast<unsigned char*>(imgStart +
-									                                    backY * width * 4 + backX * 4);
+			                                                            backY * width * 4 + backX * 4);
 
 			unsigned char* frontPixel = reinterpret_cast<unsigned char*>(frontBmp.imgStart +
-				                                                         frontY * frontBmp.width * 4 + frontX * 4);
+			                                                             frontY * frontBmp.width * 4 + frontX * 4);
 
 			unsigned char frontAlpha = *(frontPixel + 3);
 			for (int i = 0; i < 3; ++i) {
@@ -127,16 +126,16 @@ void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int 
 	assert(frontBmp.buf != nullptr);
 
 	const unsigned char mulAlpha_mask_mem[] = {6, 255, 6, 255, 6, 255, 255, 255, 14, 255, 14, 255, 14, 255, 255, 255,
-										       6, 255, 6, 255, 6, 255, 255, 255, 14, 255, 14, 255, 14, 255, 255, 255};
+	                                           6, 255, 6, 255, 6, 255, 255, 255, 14, 255, 14, 255, 14, 255, 255, 255};
 
 	const unsigned char addAlpha_mask_mem[] = {0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 255, 0,
-								               0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 255, 0};
+	                                           0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 255, 0};
 
 	const unsigned char pack1_mask_mem[] = {0, 2, 4, 6, 8, 10, 12, 14, 255, 255, 255, 255, 255, 255, 255, 255,
-							                0, 2, 4, 6, 8, 10, 12, 14, 255, 255, 255, 255, 255, 255, 255, 255};
+	                                        0, 2, 4, 6, 8, 10, 12, 14, 255, 255, 255, 255, 255, 255, 255, 255};
 
 	const unsigned char pack2_mask_mem[] = {0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0,
-									        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	__m256i mulAlpha_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(mulAlpha_mask_mem));
 	__m256i addAlpha_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(addAlpha_mask_mem));
@@ -152,12 +151,12 @@ void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int 
 			int backX = posX + frontX;
 
 			__m128i* backPixel = reinterpret_cast<__m128i*>(imgStart +
-															backY * width * 4 + backX * 4);
+			                                                backY * width * 4 + backX * 4);
 
 			// Loading original pixels {
 			__m128i back4Px = _mm_loadu_si128(backPixel);
 			__m128i front4Px = _mm_loadu_si128(reinterpret_cast<__m128i const*>(frontBmp.imgStart +
-																				frontY * frontBmp.width * 4 + frontX * 4));
+			                                                                    frontY * frontBmp.width * 4 + frontX * 4));
 			// }
 
 			// Zero-extending them {
@@ -203,10 +202,10 @@ void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int 
 			int backX = posX + frontX;
 
 			unsigned char* backPixel = reinterpret_cast<unsigned char*>(imgStart +
-																		backY * width * 4 + backX * 4);
+			                                                            backY * width * 4 + backX * 4);
 
 			unsigned char* frontPixel = reinterpret_cast<unsigned char*>(frontBmp.imgStart +
-																		 frontY * frontBmp.width * 4 + frontX * 4);
+			                                                             frontY * frontBmp.width * 4 + frontX * 4);
 			unsigned char frontAlpha = *(frontPixel + 3);
 			for (int i = 0; i < 3; ++i) {
 				*(backPixel + i) = *(frontPixel + i) * frontAlpha / 256 + *(backPixel + i) * (256 - frontAlpha) / 256;
@@ -292,6 +291,5 @@ int main() {
 	frontF.close();
 	fout.close();
 	fout_opt.close();
-
 	return 0;
 }
