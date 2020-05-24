@@ -18,4 +18,4 @@ After looping the algorithms 10000 times we got the folowing runtimes:
 
 ![Times of algorithms](./Images/Times.png)
 
-The time gain is 6.4x!
+The time gain is 7.25x!
