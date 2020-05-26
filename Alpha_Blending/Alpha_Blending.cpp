@@ -20,17 +20,42 @@ int GetFileSize(std::ifstream& file) {
 	return res;
 }
 
+#pragma pack(1)
+struct BMP_Header {
+	short bfType = 0;
+	int bfSize = 0;
+	int bfReserved = 0;
+	int bfOffBits = 0;
 
-class BMP_Structure {
+	int biSize = 0;
+
+
+	int biWidth = 0;
+	int biHeight = 0;
+	short biPlanes = 0;
+	short biBitCount = 0;
+	int biCompression = 0;
+
+	int biSizeImage = 0;
+
+	int biXPelsPerMeter = 0;
+	int biYPelsPerMeter = 0;
+	int biClrUsed = 0;
+
+	int biClrImportant = 0;
+};
+#pragma pack()
+
+class BMP_Img {
 public:
 
-	BMP_Structure(std::ifstream& fin) {
+	BMP_Img(std::ifstream& fin) {
 		assert(fin.is_open());
 
 		FromFile(fin);
 	}
 
-	BMP_Structure(char* bmpBuf, int bmpSize) {
+	BMP_Img(char* bmpBuf, int bmpSize) {
 		assert(bmpBuf > 0);
 		assert(bmpSize > 0);
 
@@ -40,13 +65,13 @@ public:
 		Init();
 	}
 
-	~BMP_Structure() {
+	~BMP_Img() {
 		delete[] buf;
 	}
 
-	void OverlayImg(BMP_Structure& frontBmp, int posX, int posY);
+	void OverlayImg(BMP_Img& frontBmp, int posX, int posY);
 
-	void OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int posY);
+	void OverlayImg_optimized(BMP_Img& frontBmp, int posX, int posY);
 
 	void ToFile(std::ofstream& fout);
 
@@ -70,46 +95,35 @@ public:
 private:
 
 	void Init() {
-		const int startOffsetPos = 10;
-		const int widthOffsetPos = 18;
-		const int heightOffsetPos = 22;
-
-		int startOffset = *reinterpret_cast<int*>(buf + startOffsetPos);
-		assert(bufSize > startOffset);
-		imgStart = buf + startOffset;
-
-		width = *reinterpret_cast<int*>(buf + widthOffsetPos);
-		height = *reinterpret_cast<int*>(buf + heightOffsetPos);
+		bmpHeader = reinterpret_cast<BMP_Header*>(buf);
+		imgStart = buf + sizeof(BMP_Header);
 	}
 
-
-public:
 	char* buf = nullptr;
 
 	char* imgStart = nullptr;
 
-	int width = 0;
-	int height = 0;
-
 	int bufSize = 0;
+
+	BMP_Header* bmpHeader = {};
 };
 
-void BMP_Structure::OverlayImg(BMP_Structure& frontBmp, int posX, int posY) {
+void BMP_Img::OverlayImg(BMP_Img& frontBmp, int posX, int posY) {
 	assert(buf != nullptr);
 	assert(frontBmp.buf != nullptr);
 
 
-	for (int frontX = 0; frontX < frontBmp.width; ++frontX) {
-		for (int frontY = 0; frontY < frontBmp.height; ++frontY) {
+	for (int frontX = 0; frontX < frontBmp.bmpHeader->biWidth; ++frontX) {
+		for (int frontY = 0; frontY < frontBmp.bmpHeader->biHeight; ++frontY) {
 
 			int backX = posX + frontX;
 			int backY = posY + frontY;
 
 			unsigned char* backPixel = reinterpret_cast<unsigned char*>(imgStart +
-			                                                            backY * width * 4 + backX * 4);
+			                                                            backY * bmpHeader->biWidth * 4 + backX * 4);
 
 			unsigned char* frontPixel = reinterpret_cast<unsigned char*>(frontBmp.imgStart +
-			                                                             frontY * frontBmp.width * 4 + frontX * 4);
+			                                                             frontY * frontBmp.bmpHeader->biWidth * 4 + frontX * 4);
 
 			unsigned char frontAlpha = *(frontPixel + 3);
 			for (int i = 0; i < 3; ++i) {
@@ -121,7 +135,7 @@ void BMP_Structure::OverlayImg(BMP_Structure& frontBmp, int posX, int posY) {
 }
 
 
-void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int posY) {
+void BMP_Img::OverlayImg_optimized(BMP_Img& frontBmp, int posX, int posY) {
 	assert(buf != nullptr);
 	assert(frontBmp.buf != nullptr);
 
@@ -142,21 +156,21 @@ void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int 
 	__m256i pack1_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(pack1_mask_mem));
 	__m256i pack2_mask = _mm256_loadu_si256(reinterpret_cast<__m256i const*>(pack2_mask_mem));
 
-	for (int frontY = 0; frontY < frontBmp.height; ++frontY) {
+	for (int frontY = 0; frontY < frontBmp.bmpHeader->biHeight; ++frontY) {
 		int backY = posY + frontY;
 
 		int frontX = 0;
-		while (frontX < frontBmp.width - 3) {
+		while (frontX < frontBmp.bmpHeader->biWidth - 3) {
 
 			int backX = posX + frontX;
 
 			__m128i* backPixel = reinterpret_cast<__m128i*>(imgStart +
-			                                                backY * width * 4 + backX * 4);
+			                                                backY * bmpHeader->biWidth * 4 + backX * 4);
 
 			// Loading original pixels {
 			__m128i back4Px = _mm_loadu_si128(backPixel);
 			__m128i front4Px = _mm_loadu_si128(reinterpret_cast<__m128i const*>(frontBmp.imgStart +
-			                                                                    frontY * frontBmp.width * 4 + frontX * 4));
+			                                                                    frontY * frontBmp.bmpHeader->biWidth * 4 + frontX * 4));
 			// }
 
 			// Zero-extending them {
@@ -197,15 +211,15 @@ void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int 
 
 
 		// Rest (less than 4px) with naive algorithm
-		while (frontX < frontBmp.width) {
+		while (frontX < frontBmp.bmpHeader->biWidth) {
 
 			int backX = posX + frontX;
 
 			unsigned char* backPixel = reinterpret_cast<unsigned char*>(imgStart +
-			                                                            backY * width * 4 + backX * 4);
+			                                                            backY * bmpHeader->biWidth * 4 + backX * 4);
 
 			unsigned char* frontPixel = reinterpret_cast<unsigned char*>(frontBmp.imgStart +
-			                                                             frontY * frontBmp.width * 4 + frontX * 4);
+			                                                             frontY * frontBmp.bmpHeader->biWidth * 4 + frontX * 4);
 			unsigned char frontAlpha = *(frontPixel + 3);
 			for (int i = 0; i < 3; ++i) {
 				*(backPixel + i) = *(frontPixel + i) * frontAlpha / 256 + *(backPixel + i) * (256 - frontAlpha) / 256;
@@ -218,7 +232,7 @@ void BMP_Structure::OverlayImg_optimized(BMP_Structure& frontBmp, int posX, int 
 }
 
 
-void BMP_Structure::ToFile(std::ofstream& fout) {
+void BMP_Img::ToFile(std::ofstream& fout) {
 	assert(fout.is_open());
 	assert(buf != nullptr);
 
@@ -235,8 +249,8 @@ void MergeImages(std::ifstream& backF, std::ifstream& frontF, std::ofstream& fou
 	const int posX = 220;
 	const int posY = 260;
 
-	BMP_Structure backBmp(backF);
-	BMP_Structure frontBmp(frontF);
+	BMP_Img backBmp(backF);
+	BMP_Img frontBmp(frontF);
 
 #ifdef COMPARE_TIMES
 	const int timesLoop = 100000;
