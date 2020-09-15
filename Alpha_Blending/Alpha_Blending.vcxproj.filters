@@ -18,5 +18,13 @@
     <ClCompile Include="Alpha_Blending.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BMP_Img.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BMP_Img.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

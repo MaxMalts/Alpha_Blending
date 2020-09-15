@@ -152,6 +152,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Alpha_Blending.cpp" />
+    <ClCompile Include="BMP_Img.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BMP_Img.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
